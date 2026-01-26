@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue Team - Security Operations Center</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="blue-team-body">
+    <nav class="top-nav">
+        <div class="nav-content">
+            <a href="/" class="nav-logo"><i class="fas fa-shield-alt"></i> Blue Team</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="/red-team" class="nav-link"><i class="fas fa-crosshairs"></i> Red Team</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Security Overview Dashboard -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Security Overview</h2>
+            <div class="dashboard-grid">
+                <div class="metric-card">
+                    <div class="metric-icon security-score">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="securityScore">100</h3>
+                        <p>Security Score</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon active-threats">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="activeThreats">0</h3>
+                        <p>Active Threats</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon total-alerts">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="totalAlerts">0</h3>
+                        <p>Total Alerts</p>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon blocked-attacks">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div class="metric-content">
+                        <h3 id="blockedAttacks">0</h3>
+                        <p>Blocked Attacks</p>
+                    </div>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-indicator" id="systemStatus">
+                    <i class="fas fa-circle"></i> Operational
+                </span>
+            </div>
+        </section>
+
+        <!-- Real-Time Monitoring -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-eye"></i> Real-Time Monitoring</h2>
+            <div class="monitoring-panel">
+                <div class="alert-feed">
+                    <h3>Live Alert Feed</h3>
+                    <div class="alert-list" id="alertFeed">
+                        <!-- Alerts will appear here -->
+                    </div>
+                </div>
+                <div class="traffic-visualization">
+                    <h3>Network Traffic</h3>
+                    <div class="chart-container">
+                        <canvas id="trafficChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- IDS Panel -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-search"></i> Intrusion Detection System (IDS)</h2>
+            <div class="ids-panel">
+                <div class="ids-rules">
+                    <h3>Detection Rules</h3>
+                    <button class="btn btn-blue btn-small" id="addRuleBtn">
+                        <i class="fas fa-plus"></i> Add Rule
+                    </button>
+                    <div class="rules-list" id="rulesList">
+                        <!-- Rules will be loaded here -->
+                    </div>
+                </div>
+                <div class="ids-config">
+                    <h3>Configuration</h3>
+                    <div class="config-item">
+                        <label>Detection Sensitivity:</label>
+                        <input type="range" id="sensitivity" min="1" max="10" value="5">
+                        <span id="sensitivityValue">5</span>
+                    </div>
+                    <div class="config-item">
+                        <label>Auto-block on Detection:</label>
+                        <input type="checkbox" id="autoBlock" checked>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Log Analysis Center -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-file-alt"></i> Log Analysis Center</h2>
+            <div class="log-panel">
+                <div class="log-filters">
+                    <input type="text" id="logSearch" class="form-control" placeholder="Search logs...">
+                    <select id="logTypeFilter" class="form-control">
+                        <option value="">All Types</option>
+                        <option value="attack">Attack</option>
+                        <option value="system">System</option>
+                        <option value="network">Network</option>
+                    </select>
+                    <select id="logSeverityFilter" class="form-control">
+                        <option value="">All Severities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="log-viewer" id="logViewer">
+                    <!-- Logs will appear here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Alert Management -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-bell"></i> Alert Management</h2>
+            <div class="alert-panel">
+                <div class="alert-filters">
+                    <select id="alertStatusFilter" class="form-control">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="acknowledged">Acknowledged</option>
+                    </select>
+                    <select id="alertSeverityFilter" class="form-control">
+                        <option value="">All Severities</option>
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+                <div class="alert-queue" id="alertQueue">
+                    <!-- Alerts will appear here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Firewall Control Panel -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-fire"></i> Firewall Control Panel</h2>
+            <div class="firewall-panel">
+                <div class="firewall-rules">
+                    <h3>Active Rules</h3>
+                    <button class="btn btn-blue btn-small" id="addFirewallRuleBtn">
+                        <i class="fas fa-plus"></i> Add Rule
+                    </button>
+                    <div class="rules-list" id="firewallRulesList">
+                        <!-- Firewall rules will appear here -->
+                    </div>
+                </div>
+                <div class="blocked-ips">
+                    <h3>Blocked IPs</h3>
+                    <div class="block-ip-form">
+                        <input type="text" id="blockIPInput" class="form-control" placeholder="IP address to block">
+                        <button class="btn btn-red btn-small" id="blockIPBtn">
+                            <i class="fas fa-ban"></i> Block
+                        </button>
+                    </div>
+                    <div class="blocked-ips-list" id="blockedIPsList">
+                        <!-- Blocked IPs will appear here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Forensics & Investigation -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-search-plus"></i> Forensics & Investigation</h2>
+            <div class="forensics-panel">
+                <div class="forensics-tabs">
+                    <button class="tab-btn active" data-tab="timeline">Attack Timeline</button>
+                    <button class="tab-btn" data-tab="patterns">Pattern Analysis</button>
+                    <button class="tab-btn" data-tab="profiling">Attacker Profiling</button>
+                </div>
+                <div class="forensics-content">
+                    <div class="tab-content active" id="timelineTab">
+                        <div class="timeline-view" id="attackTimeline">
+                            <!-- Timeline will appear here -->
+                        </div>
+                    </div>
+                    <div class="tab-content" id="patternsTab">
+                        <div id="patternAnalysis">No pattern analysis available</div>
+                    </div>
+                    <div class="tab-content" id="profilingTab">
+                        <div id="attackerProfile">No attacker profile data</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Reports & Audit Logs -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-file-chart-line"></i> Reports & Audit Logs</h2>
+            <div class="reports-panel">
+                <div class="report-cards">
+                    <div class="report-card">
+                        <h3>Security Posture Report</h3>
+                        <p>Current security status and recommendations</p>
+                        <button class="btn btn-blue btn-small" id="generatePostureReport">
+                            <i class="fas fa-download"></i> Generate
+                        </button>
+                    </div>
+                    <div class="report-card">
+                        <h3>Incident Report</h3>
+                        <p>Detailed incident analysis and response</p>
+                        <button class="btn btn-blue btn-small" id="generateIncidentReport">
+                            <i class="fas fa-download"></i> Generate
+                        </button>
+                    </div>
+                    <div class="report-card">
+                        <h3>Compliance Dashboard</h3>
+                        <p>Compliance metrics and audit trail</p>
+                        <button class="btn btn-blue btn-small" id="generateComplianceReport">
+                            <i class="fas fa-download"></i> Generate
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/blue_team.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethical Hacking Platform - Red vs Blue Team</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-content">
+                <h1><i class="fas fa-shield-alt"></i> Ethical Hacking Platform</h1>
+                <p class="subtitle">Red Team vs Blue Team Simulation Environment</p>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="team-selection">
+                <div class="team-card red-team-card">
+                    <div class="team-icon">
+                        <i class="fas fa-crosshairs"></i>
+                    </div>
+                    <h2>🔴 Red Team</h2>
+                    <p class="team-description">Attack Simulation & Penetration Testing</p>
+                    <ul class="team-features">
+                        <li><i class="fas fa-check"></i> Attack Arsenal</li>
+                        <li><i class="fas fa-check"></i> Real-time Execution</li>
+                        <li><i class="fas fa-check"></i> Results & Reporting</li>
+                        <li><i class="fas fa-check"></i> Attack History</li>
+                    </ul>
+                    <a href="/red-team" class="btn btn-red">Enter Red Team</a>
+                </div>
+
+                <div class="team-card blue-team-card">
+                    <div class="team-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h2>🔵 Blue Team</h2>
+                    <p class="team-description">Security Operations Center (SOC)</p>
+                    <ul class="team-features">
+                        <li><i class="fas fa-check"></i> Real-time Monitoring</li>
+                        <li><i class="fas fa-check"></i> Intrusion Detection</li>
+                        <li><i class="fas fa-check"></i> Alert Management</li>
+                        <li><i class="fas fa-check"></i> Forensics & Analysis</li>
+                    </ul>
+                    <a href="/blue-team" class="btn btn-blue">Enter Blue Team</a>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3><i class="fas fa-info-circle"></i> About This Platform</h3>
+                <p>This is an educational ethical hacking platform designed for learning cybersecurity concepts. 
+                The platform simulates both offensive (Red Team) and defensive (Blue Team) security operations 
+                in a controlled environment.</p>
+                <div class="warning-box">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Educational Purpose Only:</strong> This platform is designed for learning and should 
+                    only be used in authorized environments with proper permissions.
+                </div>
+            </div>
+        </main>
+
+        <footer class="main-footer">
+            <p>&copy; 2026 Ethical Hacking Platform - Academic Project</p>
+        </footer>
+    </div>
+</body>
+</html>

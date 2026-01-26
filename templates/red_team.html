@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red Team - Attack Simulation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body class="red-team-body">
+    <nav class="top-nav">
+        <div class="nav-content">
+            <a href="/" class="nav-logo"><i class="fas fa-crosshairs"></i> Red Team</a>
+            <div class="nav-links">
+                <a href="/" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="/blue-team" class="nav-link"><i class="fas fa-shield-alt"></i> Blue Team</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Dashboard Header -->
+        <header class="dashboard-header">
+            <h1><i class="fas fa-crosshairs"></i> Red Team Dashboard</h1>
+            <p class="subtitle">Attack Simulation & Penetration Testing Interface</p>
+        </header>
+
+        <!-- Attack Arsenal Section -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-bomb"></i> Attack Arsenal</h2>
+            <div class="attack-grid" id="attackGrid">
+                <!-- Attack cards will be loaded here -->
+            </div>
+        </section>
+
+        <!-- Attack Configuration Panel -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-cog"></i> Attack Configuration</h2>
+            <div class="config-panel">
+                <div class="form-group">
+                    <label for="attackType">Attack Type:</label>
+                    <select id="attackType" class="form-control">
+                        <option value="">Select an attack...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="target">Target:</label>
+                    <input type="text" id="target" class="form-control" placeholder="IP address or domain (e.g., 192.168.1.1)">
+                </div>
+                <div class="form-group" id="parameterGroup">
+                    <!-- Dynamic parameters will be loaded here -->
+                </div>
+                <button class="btn btn-red btn-launch" id="launchBtn">
+                    <i class="fas fa-rocket"></i> Launch Attack
+                </button>
+            </div>
+        </section>
+
+        <!-- Attack Execution View -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-terminal"></i> Attack Execution</h2>
+            <div class="execution-panel">
+                <div class="execution-header">
+                    <span id="executionStatus">No active attacks</span>
+                    <div class="execution-controls">
+                        <button class="btn btn-small btn-red" id="abortBtn" disabled>
+                            <i class="fas fa-stop"></i> Abort
+                        </button>
+                    </div>
+                </div>
+                <div class="terminal-output" id="terminalOutput">
+                    <div class="terminal-line">Ready to launch attacks...</div>
+                </div>
+                <div class="progress-section">
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progressBar" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-stats">
+                        <span id="progressText">0%</span>
+                        <span id="packetCount">Packets: 0</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results & Reporting -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-chart-line"></i> Results & Reporting</h2>
+            <div class="results-panel">
+                <div class="results-tabs">
+                    <button class="tab-btn active" data-tab="summary">Summary</button>
+                    <button class="tab-btn" data-tab="vulnerabilities">Vulnerabilities</button>
+                    <button class="tab-btn" data-tab="data">Captured Data</button>
+                </div>
+                <div class="results-content">
+                    <div class="tab-content active" id="summaryTab">
+                        <div class="result-card">
+                            <h3>Attack Summary</h3>
+                            <div id="attackSummary">No attacks completed yet</div>
+                        </div>
+                    </div>
+                    <div class="tab-content" id="vulnerabilitiesTab">
+                        <div id="vulnerabilitiesList">No vulnerabilities found</div>
+                    </div>
+                    <div class="tab-content" id="dataTab">
+                        <div id="capturedData">No data captured</div>
+                    </div>
+                </div>
+                <div class="export-buttons">
+                    <button class="btn btn-small" id="exportPDF">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </button>
+                    <button class="btn btn-small" id="exportJSON">
+                        <i class="fas fa-file-code"></i> Export JSON
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Attack History -->
+        <section class="section">
+            <h2 class="section-title"><i class="fas fa-history"></i> Attack History</h2>
+            <div class="history-panel">
+                <div class="history-filters">
+                    <select id="historyFilter" class="form-control">
+                        <option value="all">All Attacks</option>
+                        <option value="sql_injection">SQL Injection</option>
+                        <option value="brute_force">Brute Force</option>
+                        <option value="port_scanner">Port Scanner</option>
+                        <option value="ddos">DDoS</option>
+                    </select>
+                </div>
+                <div class="history-timeline" id="historyTimeline">
+                    <!-- History items will be loaded here -->
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/red_team.js') }}"></script>
+</body>
+</html>
