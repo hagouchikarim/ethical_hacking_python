@@ -1,6 +1,8 @@
 // Red Team JavaScript
 const socket = io('/red');
 let currentAttack = null;
+let currentAttackMeta = null;      // { id, type, target }
+let lastCompletedAttack = null;    // fallback when history is empty
 let attackHistory = [];
 
 // Initialize
@@ -178,6 +180,7 @@ async function launchAttack() {
         
         const data = await response.json();
         currentAttack = data.attack_id;
+        currentAttackMeta = { id: data.attack_id, type: attackType, target };
         document.getElementById('abortBtn').disabled = false;
         document.getElementById('executionStatus').textContent = `Attack ${data.attack_id} running...`;
         addTerminalLine(`🚀 Launching attack: ${attackType} on ${target}`, 'info');
@@ -215,7 +218,20 @@ function connectWebSocket() {
     socket.on('attack_complete', (data) => {
         if (data.attack_id === currentAttack) {
             handleAttackComplete(data.result);
+            // keep a local copy of the last completed attack in case history is empty
+            if (currentAttackMeta) {
+                lastCompletedAttack = {
+                    id: currentAttackMeta.id,
+                    type: currentAttackMeta.type,
+                    target: currentAttackMeta.target,
+                    status: data.result.success ? 'completed' : 'failed',
+                    start_time: new Date().toISOString(),
+                    end_time: new Date().toISOString(),
+                    result: data.result
+                };
+            }
             currentAttack = null;
+            currentAttackMeta = null;
             document.getElementById('abortBtn').disabled = true;
             document.getElementById('executionStatus').textContent = 'Attack completed';
             loadAttackHistory();
@@ -335,6 +351,15 @@ function displayHistory() {
         : attackHistory.filter(a => a.type === filter);
     
     filtered.reverse().forEach(attack => {
+        const result = attack.result || {};
+
+        // Per-attack metrics depending on type
+        const vulnsCount = result.vulnerabilities_found?.length || 0;
+        const dataItems = result.data_extracted?.length || 0;
+        const credsFound = result.credentials_found ? 1 : 0;
+        const openPorts = result.open_ports?.length || 0;
+        const ddosPackets = result.packets_sent || 0;
+
         const item = document.createElement('div');
         item.className = 'history-item';
         item.innerHTML = `
@@ -342,22 +367,237 @@ function displayHistory() {
             <p><strong>Target:</strong> ${attack.target}</p>
             <p><strong>Status:</strong> ${attack.status}</p>
             <p><strong>Time:</strong> ${new Date(attack.start_time).toLocaleString()}</p>
+            <p><strong>Key Results:</strong></p>
+            <ul>
+                ${vulnsCount ? `<li>Vulnerabilities: ${vulnsCount}</li>` : ''}
+                ${dataItems ? `<li>Data extracted items: ${dataItems}</li>` : ''}
+                ${credsFound ? `<li>Credentials found: ${credsFound}</li>` : ''}
+                ${openPorts ? `<li>Open ports: ${openPorts}</li>` : ''}
+                ${ddosPackets ? `<li>DDoS packets sent: ${ddosPackets}</li>` : ''}
+                ${(!vulnsCount && !dataItems && !credsFound && !openPorts && !ddosPackets)
+                    ? '<li>No notable findings</li>' : ''}
+            </ul>
+            <button class="btn btn-small" type="button">Toggle details</button>
+            <pre class="history-details" style="display:none; margin-top:10px;">${JSON.stringify(result, null, 2)}</pre>
         `;
+
+        // Toggle details view
+        const toggleBtn = item.querySelector('button');
+        const detailsEl = item.querySelector('.history-details');
+        toggleBtn.addEventListener('click', () => {
+            detailsEl.style.display = detailsEl.style.display === 'none' ? 'block' : 'none';
+        });
+
         timeline.appendChild(item);
     });
 }
 
+// Helper: build structured report object from history
+function buildReportData() {
+    // Prefer server-side history; if empty, fall back to last completed attack in this session
+    const sourceAttacks = attackHistory.length
+        ? attackHistory
+        : (lastCompletedAttack ? [lastCompletedAttack] : []);
+
+    if (!sourceAttacks.length) {
+        return null;
+    }
+
+    const summary = {
+        total_attacks: sourceAttacks.length,
+        by_type: {},
+        total_vulnerabilities: 0,
+        total_data_items: 0,
+        total_credentials_found: 0,
+        total_open_ports: 0,
+        total_ddos_packets: 0
+    };
+
+    const detailed = sourceAttacks.map(attack => {
+        const result = attack.result || {};
+        const common = {
+            id: attack.id,
+            type: attack.type,
+            target: attack.target,
+            status: attack.status,
+            start_time: attack.start_time,
+            end_time: attack.end_time || null
+        };
+
+        const normalized = {
+            ...common,
+            // SQL Injection specific
+            vulnerabilities: result.vulnerabilities_found || [],
+            data_exfiltrated: result.data_extracted || [],
+            // Brute force specific
+            credentials_found: result.credentials_found || null,
+            attempts: result.attempts || 0,
+            // Port scanner specific
+            open_ports: result.open_ports || [],
+            closed_ports: result.closed_ports || [],
+            filtered_ports: result.filtered_ports || [],
+            // DDoS specific
+            packets_sent: result.packets_sent || 0,
+            bytes_sent: result.bytes_sent || 0,
+            avg_response_time: (() => {
+                if (result.target_response_time && result.target_response_time.length) {
+                    const avg = result.target_response_time
+                        .map(r => r.response_time)
+                        .reduce((a, b) => a + b, 0) / result.target_response_time.length;
+                    return avg;
+                }
+                return 0;
+            })()
+        };
+
+        // Update summary
+        const typeKey = attack.type;
+        if (!summary.by_type[typeKey]) {
+            summary.by_type[typeKey] = {
+                count: 0,
+                successes: 0,
+                failures: 0,
+                vulnerabilities: 0,
+                data_items: 0
+            };
+        }
+        const typeStats = summary.by_type[typeKey];
+        typeStats.count += 1;
+        if (result.success) typeStats.successes += 1;
+        else typeStats.failures += 1;
+
+        const vulnsCount = normalized.vulnerabilities.length;
+        const dataItems = normalized.data_exfiltrated.length;
+        const creds = normalized.credentials_found ? 1 : 0;
+        const openPorts = normalized.open_ports.length;
+        const ddosPackets = normalized.packets_sent;
+
+        typeStats.vulnerabilities += vulnsCount;
+        typeStats.data_items += dataItems;
+
+        summary.total_vulnerabilities += vulnsCount;
+        summary.total_data_items += dataItems;
+        summary.total_credentials_found += creds;
+        summary.total_open_ports += openPorts;
+        summary.total_ddos_packets += ddosPackets;
+
+        return normalized;
+    });
+
+    return {
+        generated_at: new Date().toISOString(),
+        summary,
+        attacks: detailed
+    };
+}
+
 // Export functions
 function exportPDF() {
-    alert('PDF export functionality would be implemented here');
+    const report = buildReportData();
+    if (!report) {
+        alert('No attacks in history to export.');
+        return;
+    }
+    const w = window.open('', '_blank');
+    if (!w) {
+        alert('Popup blocked. Please allow popups for PDF export.');
+        return;
+    }
+
+    const docTitle = 'Red Team Attack Report';
+    const style = `
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1, h2, h3 { color: #333; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ccc; padding: 6px 8px; font-size: 12px; }
+            th { background: #f0f0f0; }
+            .section { margin-bottom: 25px; }
+            .small { font-size: 11px; color: #666; }
+            pre { font-size: 10px; background: #f9f9f9; padding: 8px; }
+        </style>
+    `;
+
+    let html = `<html><head><title>${docTitle}</title>${style}</head><body>`;
+    html += `<h1>${docTitle}</h1>`;
+    html += `<p class="small">Generated at: ${report.generated_at}</p>`;
+
+    // Summary section
+    html += '<div class="section"><h2>Summary</h2>';
+    html += '<table><tbody>';
+    html += `<tr><th>Total attacks</th><td>${report.summary.total_attacks}</td></tr>`;
+    html += `<tr><th>Total vulnerabilities</th><td>${report.summary.total_vulnerabilities}</td></tr>`;
+    html += `<tr><th>Total data items exfiltrated</th><td>${report.summary.total_data_items}</td></tr>`;
+    html += `<tr><th>Total credentials found</th><td>${report.summary.total_credentials_found}</td></tr>`;
+    html += `<tr><th>Total open ports discovered</th><td>${report.summary.total_open_ports}</td></tr>`;
+    html += `<tr><th>Total DDoS packets sent</th><td>${report.summary.total_ddos_packets}</td></tr>`;
+    html += '</tbody></table></div>';
+
+    // Per-type stats
+    html += '<div class="section"><h2>By Attack Type</h2>';
+    html += '<table><thead><tr><th>Type</th><th>Count</th><th>Successes</th><th>Failures</th><th>Vulns</th><th>Data Items</th></tr></thead><tbody>';
+    Object.entries(report.summary.by_type).forEach(([type, stats]) => {
+        html += `<tr>
+            <td>${type.replace('_', ' ')}</td>
+            <td>${stats.count}</td>
+            <td>${stats.successes}</td>
+            <td>${stats.failures}</td>
+            <td>${stats.vulnerabilities}</td>
+            <td>${stats.data_items}</td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    // Detailed per-attack section
+    html += '<div class="section"><h2>Attack Details</h2>';
+    report.attacks.forEach(a => {
+        html += `<h3>${a.type.replace('_', ' ').toUpperCase()} - ${a.id}</h3>`;
+        html += '<table><tbody>';
+        html += `<tr><th>Target</th><td>${a.target}</td></tr>`;
+        html += `<tr><th>Status</th><td>${a.status}</td></tr>`;
+        html += `<tr><th>Start time</th><td>${a.start_time}</td></tr>`;
+        if (a.end_time) html += `<tr><th>End time</th><td>${a.end_time}</td></tr>`;
+        html += `<tr><th>Vulnerabilities</th><td>${a.vulnerabilities.length}</td></tr>`;
+        html += `<tr><th>Data items</th><td>${a.data_exfiltrated.length}</td></tr>`;
+        if (a.credentials_found) {
+            html += `<tr><th>Credentials found</th><td>${a.credentials_found.username} / ${a.credentials_found.password}</td></tr>`;
+        }
+        if (a.open_ports.length) {
+            html += `<tr><th>Open ports</th><td>${a.open_ports.map(p => p.port).join(', ')}</td></tr>`;
+        }
+        if (a.packets_sent) {
+            html += `<tr><th>DDoS packets sent</th><td>${a.packets_sent}</td></tr>`;
+        }
+        if (a.avg_response_time) {
+            html += `<tr><th>Avg response time</th><td>${a.avg_response_time.toFixed(2)} s</td></tr>`;
+        }
+        html += '</tbody></table>';
+
+        if (a.vulnerabilities.length) {
+            html += '<strong>Vulnerabilities:</strong><pre>' + JSON.stringify(a.vulnerabilities, null, 2) + '</pre>';
+        }
+        if (a.data_exfiltrated.length) {
+            html += '<strong>Data exfiltrated:</strong><pre>' + JSON.stringify(a.data_exfiltrated, null, 2) + '</pre>';
+        }
+    });
+    html += '</div>';
+
+    html += '</body></html>';
+
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print(); // User can choose "Save as PDF"
 }
 
 function exportJSON() {
-    const data = {
-        history: attackHistory,
-        timestamp: new Date().toISOString()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const report = buildReportData();
+    if (!report) {
+        alert('No attacks in history to export.');
+        return;
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
