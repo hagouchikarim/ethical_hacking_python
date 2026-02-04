@@ -1,5 +1,5 @@
 """
-Brute Force Attack Module - FIXED
+Brute Force Attack Module
 Generates REAL HTTP traffic with CSRF token handling for DVWA
 """
 import time

@@ -1,5 +1,5 @@
 """
-DDoS Attack Module - FIXED
+DDoS Attack Module
 Performs REAL HTTP flood with better error handling and debugging
 Safe for lab environment with controlled intensity
 """

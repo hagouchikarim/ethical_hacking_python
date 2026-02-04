@@ -1,5 +1,5 @@
 """
-Port Scanner Attack Module - FIXED
+Port Scanner Attack Module
 Performs REAL port scanning with accurate results and better progress reporting
 """
 import socket

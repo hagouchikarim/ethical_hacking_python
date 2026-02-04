@@ -1,5 +1,5 @@
 """
-SQL Injection Attack Module - FIXED
+SQL Injection Attack Module
 Performs REAL SQL injection attacks against DVWA with improved data extraction
 """
 import time

@@ -6,6 +6,8 @@ import threading
 from datetime import datetime
 import random
 import os
+from defense.report_generator import generate_soc_report
+from flask import send_file
 
 # Import attack modules
 from attacks.sql_injection import SQLInjectionAttack
@@ -17,6 +19,7 @@ from attacks.ddos import DDoSAttack
 from defense.ids import IntrusionDetectionSystem
 from defense.firewall import Firewall
 from defense.log_analyzer import LogAnalyzer
+from defense.snort_monitor import SnortMonitor  # NEW: Import Snort monitor
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'ethical-hacking-project-2026'
@@ -26,6 +29,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 ids = IntrusionDetectionSystem()
 firewall = Firewall()
 log_analyzer = LogAnalyzer()
+snort_monitor = None  # NEW: Will be initialized on startup
 
 # Global state
 attack_history = []
@@ -123,13 +127,13 @@ def launch_attack():
     }
     
     # Start attack in background thread
-    thread = threading.Thread(target=run_attack, args=(attack_id, attack, target))
+    thread = threading.Thread(target=run_attack, args=(attack_id, attack, target, attack_type))
     thread.daemon = True
     thread.start()
     
     return jsonify({'attack_id': attack_id, 'status': 'launched'})
 
-def run_attack(attack_id, attack, target):
+def run_attack(attack_id, attack, target, attack_type):
     """Execute attack and emit real-time updates"""
     try:
         # Generate log entry
@@ -137,7 +141,7 @@ def run_attack(attack_id, attack, target):
             'timestamp': datetime.now().isoformat(),
             'type': 'attack',
             'attack_id': attack_id,
-            'attack_type': attack.__class__.__name__,
+            'attack_type': attack_type,
             'target': target,
             'message': f'Attack {attack_id} initiated'
         }
@@ -166,7 +170,7 @@ def run_attack(attack_id, attack, target):
                 'timestamp': datetime.now().isoformat(),
                 'type': 'attack',
                 'attack_id': attack_id,
-                'attack_type': attack.__class__.__name__,
+                'attack_type': attack_type,
                 'target': target,
                 'message': update.get('message', 'Attack in progress')
             }
@@ -175,11 +179,28 @@ def run_attack(attack_id, attack, target):
             
             time.sleep(0.5)  # Simulate attack progression
         
-        # Attack completed
+        # Attack completed - check for Snort correlations
         result = attack.get_results()
         active_attacks[attack_id]['status'] = 'completed'
         active_attacks[attack_id]['result'] = result
         active_attacks[attack_id]['end_time'] = datetime.now().isoformat()
+        
+        # NEW: Correlate with Snort alerts
+        if snort_monitor and snort_monitor.running:
+            time.sleep(2)  # Give Snort time to process
+            correlated_alerts = snort_monitor.correlate_with_attack(attack_id, attack_type)
+            
+            if correlated_alerts:
+                active_attacks[attack_id]['snort_detections'] = len(correlated_alerts)
+                
+                # Emit correlation notification
+                socketio.emit('attack_correlation', {
+                    'attack_id': attack_id,
+                    'snort_alerts': len(correlated_alerts),
+                    'message': f'Snort detected {len(correlated_alerts)} suspicious activities related to this attack'
+                }, namespace='/blue')
+                
+                print(f"[Correlation] Attack {attack_id} correlated with {len(correlated_alerts)} Snort alerts")
         
         attack_history.append(active_attacks[attack_id].copy())
         
@@ -235,31 +256,94 @@ def get_dashboard():
     total_alerts = len(security_alerts)
     critical_alerts = len([a for a in security_alerts if a.get('severity') == 'Critical'])
     
+    # NEW: Include Snort statistics
+    snort_stats = snort_monitor.get_stats() if snort_monitor else {}
+    snort_alerts = snort_stats.get('total_alerts', 0)
+    
     # Reduce score based on threats
-    security_score = max(0, 100 - (critical_alerts * 10) - (total_alerts * 2))
+    security_score = max(0, 100 - (critical_alerts * 10) - (total_alerts * 2) - (snort_alerts * 1))
     
     return jsonify({
         'security_score': security_score,
         'active_threats': len([a for a in security_alerts if a.get('status') == 'active']),
         'total_alerts': total_alerts,
         'blocked_attacks': blocked_count,
-        'system_status': 'operational' if security_score > 50 else 'compromised'
+        'system_status': 'operational' if security_score > 50 else 'compromised',
+        'snort_enabled': snort_monitor.running if snort_monitor else False,
+        'snort_alerts': snort_alerts
     })
+
+@app.route('/api/blue/report/pdf', methods=['POST'])
+def generate_pdf_report():
+    """Generate comprehensive SOC audit report as PDF"""
+    try:
+        # Gather all data
+        dashboard = {
+            'security_score': security_score,
+            'active_threats': len([a for a in security_alerts if a.get('status') == 'active']),
+            'total_alerts': len(security_alerts),
+            'snort_alerts': snort_monitor.get_stats().get('total_alerts', 0) if snort_monitor else 0,
+            'blocked_attacks': len(firewall.get_blocked_ips()),
+            'system_status': 'operational' if security_score > 50 else 'compromised',
+            'snort_enabled': snort_monitor.running if snort_monitor else False
+        }
+        
+        # Combine all alerts (IDS + Snort)
+        all_alerts = security_alerts.copy()
+        if snort_monitor:
+            all_alerts.extend(snort_monitor.get_alerts(limit=100))
+        
+        # Get Snort stats
+        snort_stats = snort_monitor.get_stats() if snort_monitor else {}
+        
+        # Generate PDF
+        pdf_buffer = generate_soc_report(
+            dashboard_data=dashboard,
+            alerts=all_alerts,
+            logs=system_logs[-100:],  # Last 100 logs
+            firewall_rules=firewall.get_rules(),
+            blocked_ips=firewall.get_blocked_ips(),
+            snort_stats=snort_stats
+        )
+        
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'SOC_Audit_Report_{int(time.time())}.pdf'
+        )
+        
+    except Exception as e:
+        print(f"[PDF Report] Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/blue/alerts', methods=['GET'])
 def get_alerts():
-    """Get security alerts"""
+    """Get security alerts (combined IDS + Snort)"""
     status_filter = request.args.get('status')
     severity_filter = request.args.get('severity')
+    source_filter = request.args.get('source')  # NEW: 'ids' or 'snort'
     
-    alerts = security_alerts.copy()
+    # Combine IDS alerts and Snort alerts
+    all_alerts = security_alerts.copy()
     
+    # NEW: Add Snort alerts
+    if snort_monitor:
+        snort_alerts = snort_monitor.get_alerts(limit=100)
+        all_alerts.extend(snort_alerts)
+    
+    # Apply filters
     if status_filter:
-        alerts = [a for a in alerts if a.get('status') == status_filter]
+        all_alerts = [a for a in all_alerts if a.get('status') == status_filter]
     if severity_filter:
-        alerts = [a for a in alerts if a.get('severity') == severity_filter]
+        all_alerts = [a for a in all_alerts if a.get('severity') == severity_filter]
+    if source_filter:
+        all_alerts = [a for a in all_alerts if a.get('source') == source_filter]
     
-    return jsonify(alerts)
+    # Sort by timestamp (most recent first)
+    all_alerts.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    
+    return jsonify(all_alerts)
 
 @app.route('/api/blue/alerts/<alert_id>/acknowledge', methods=['POST'])
 def acknowledge_alert(alert_id):
@@ -286,6 +370,62 @@ def get_logs():
     
     return jsonify(logs)
 
+# NEW: Snort-specific endpoints
+@app.route('/api/blue/snort/status', methods=['GET'])
+def get_snort_status():
+    """Get Snort monitor status"""
+    if not snort_monitor:
+        return jsonify({'error': 'Snort monitor not initialized'}), 503
+    
+    stats = snort_monitor.get_stats()
+    return jsonify(stats)
+
+@app.route('/api/blue/snort/alerts', methods=['GET'])
+def get_snort_alerts():
+    """Get Snort alerts only"""
+    if not snort_monitor:
+        return jsonify([])
+    
+    attack_type = request.args.get('attack_type')
+    severity = request.args.get('severity')
+    limit = int(request.args.get('limit', 50))
+    
+    alerts = snort_monitor.get_alerts(limit=limit, attack_type=attack_type, severity=severity)
+    return jsonify(alerts)
+
+@app.route('/api/blue/snort/start', methods=['POST'])
+def start_snort_monitor():
+    """Start Snort monitoring"""
+    global snort_monitor
+    
+    if not snort_monitor:
+        return jsonify({'error': 'Snort monitor not initialized'}), 503
+    
+    if snort_monitor.running:
+        return jsonify({'status': 'already_running'})
+    
+    snort_monitor.start_monitoring()
+    return jsonify({'status': 'started'})
+
+@app.route('/api/blue/snort/stop', methods=['POST'])
+def stop_snort_monitor():
+    """Stop Snort monitoring"""
+    if not snort_monitor:
+        return jsonify({'error': 'Snort monitor not initialized'}), 503
+    
+    snort_monitor.stop_monitoring()
+    return jsonify({'status': 'stopped'})
+
+@app.route('/api/blue/snort/clear', methods=['POST'])
+def clear_snort_alerts():
+    """Clear Snort alerts (for testing)"""
+    if not snort_monitor:
+        return jsonify({'error': 'Snort monitor not initialized'}), 503
+    
+    snort_monitor.clear_alerts()
+    return jsonify({'status': 'cleared'})
+
+# Existing IDS endpoints
 @app.route('/api/blue/ids/rules', methods=['GET'])
 def get_ids_rules():
     """Get IDS rules"""
@@ -382,6 +522,11 @@ def red_team_connect():
 @socketio.on('connect', namespace='/blue')
 def blue_team_connect():
     emit('connected', {'message': 'Connected to Blue Team interface'})
+    
+    # NEW: Send Snort status on connect
+    if snort_monitor:
+        stats = snort_monitor.get_stats()
+        emit('snort_status', stats)
 
 if __name__ == '__main__':
     # Create necessary directories
@@ -391,4 +536,15 @@ if __name__ == '__main__':
     os.makedirs('attacks', exist_ok=True)
     os.makedirs('defense', exist_ok=True)
     
-    socketio.run(app, debug=True, port=5000)
+    # NEW: Initialize Snort monitor
+    print("[Startup] Initializing Snort Monitor...")
+    snort_monitor = SnortMonitor(
+        alert_file='/var/log/snort/alert_fast.txt',
+        socketio=socketio
+    )
+    
+    # Start monitoring automatically
+    snort_monitor.start_monitoring()
+    print(f"[Startup] Snort Monitor initialized and started")
+    
+    socketio.run(app, debug=True, port=5000, host='0.0.0.0')
