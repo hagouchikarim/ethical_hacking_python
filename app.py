@@ -442,12 +442,9 @@ def block_ip():
     
     return jsonify({'status': 'blocked', 'rule_id': rule_id})
 
-@app.route('/api/blue/firewall/unblock', methods=['POST'])
-def unblock_ip():
-    """FIXED: Unblock an IP address"""
-    data = request.json
-    ip = data.get('ip')
-    
+@app.route('/api/blue/firewall/unblock/<ip>', methods=['POST'])
+def unblock_ip(ip):
+    """FIXED: Unblock an IP address - now accepts IP in URL path"""
     if not ip:
         return jsonify({'error': 'IP address required'}), 400
     
@@ -462,7 +459,7 @@ def unblock_ip():
     system_logs.append(log_entry)
     socketio.emit('log_update', log_entry, namespace='/blue')
     
-    return jsonify({'status': 'unblocked'})
+    return jsonify({'status': 'unblocked', 'ip': ip})
 
 @app.route('/api/blue/firewall/blocked', methods=['GET'])
 def get_blocked_ips():
