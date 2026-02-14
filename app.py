@@ -342,13 +342,6 @@ def get_dashboard():
     """Get Blue Team dashboard data"""
     global security_score
     
-    # Calculate security score
-    total_alerts = len(security_alerts)
-    critical_alerts = len([a for a in security_alerts if a.get('severity') == 'Critical'])
-    
-    # Reduce score based on alerts
-    security_score = max(0, 100 - (critical_alerts * 10) - (total_alerts * 2))
-    
     # Get active incidents count
     active_incidents = len([i for i in alert_correlator.get_active_incidents() if i.get('status') == 'active'])
     
@@ -363,7 +356,7 @@ def get_dashboard():
         'snort_alerts': len([a for a in security_alerts if a.get('source') == 'snort']),
         'blocked_attacks': len(firewall.get_blocked_ips()),
         'system_status': system_status,
-        'snort_enabled': snort_monitor.running if snort_monitor else False
+        'snort_enabled': snort_monitor.get_stats()['is_running'] if snort_monitor else False
     }
     
     return jsonify(dashboard_data)
@@ -497,7 +490,6 @@ def get_blocked_ips():
 
 @app.route('/api/blue/report/generate', methods=['POST'])
 def generate_report():
-    """FIXED: Generate SOC audit report with correct endpoint"""
     try:
         report_data = {
             'generated_at': datetime.now().isoformat(),
@@ -512,7 +504,13 @@ def generate_report():
         }
         
         pdf_path = generate_soc_report(report_data)
-        return send_file(pdf_path, as_attachment=True, download_name='soc_audit_report.pdf')
+        abs_path = os.path.abspath(pdf_path)  # FIX: absolute path
+        return send_file(
+            abs_path,
+            as_attachment=True,
+            download_name='soc_audit_report.pdf',
+            mimetype='application/pdf'  # FIX: explicit mimetype
+        )
     except Exception as e:
         print(f"[ERROR] Report generation failed: {e}")
         import traceback
@@ -550,7 +548,7 @@ def export_report_json():
 def get_incidents():
     """Get correlated incidents"""
     try:
-        alert_correlator.auto_close_old_incidents(max_age_seconds=300)
+        alert_correlator.auto_close_old_incidents(max_age_seconds=600)
         incidents = alert_correlator.get_active_incidents()
         
         status_filter = request.args.get('status')
@@ -619,7 +617,7 @@ def block_incident_source(incident_id):
 def auto_close_incidents():
     """Auto-close old incidents"""
     try:
-        closed_count = alert_correlator.auto_close_old_incidents(max_age_seconds=300)
+        closed_count = alert_correlator.auto_close_old_incidents(max_age_seconds=600)
         return jsonify({'closed_count': closed_count, 'status': 'success'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -648,15 +646,19 @@ def receive_snort_alert():
         
         if alert_line:
             alert = snort_monitor._process_alert_line(alert_line)
+            print(f"[DEBUG] _process_alert_line returned: {alert is not None}") # debug
             
             if alert:
                 print(f"[Snort API] Alert parsed successfully: {alert['rule_name']}")
+
+                security_alerts.append(alert)
                 
                 # Correlate alert into incident
                 incident_id, is_new = alert_correlator.correlate_alert(alert)
                 
                 # Emit to dashboard
                 socketio.emit('snort_alert', alert, namespace='/blue')
+                socketio.emit('new_alert', alert, namespace='/blue')
                 
                 if is_new:
                     print(f"[Snort] NEW INCIDENT {incident_id}: {alert['rule_name']}")

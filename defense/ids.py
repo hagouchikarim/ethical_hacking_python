@@ -12,7 +12,7 @@ class IntrusionDetectionSystem:
             {
                 'id': 'rule_001',
                 'name': 'SQL Injection Detection',
-                'pattern': r"('|(OR|AND)\s+\d+\s*=\s*\d+|UNION\s+SELECT|--|#|/\*|\*/|payload|vulnerability)",
+                'pattern': r"('|(OR|AND)\s+\d+\s*=\s*\d+|UNION\s+SELECT|--|#|/\*|\*/)",
                 'severity': 'High',
                 'enabled': True,
                 'description': 'Detects SQL injection attempts'
@@ -20,7 +20,7 @@ class IntrusionDetectionSystem:
             {
                 'id': 'rule_002',
                 'name': 'Brute Force Detection',
-                'pattern': r'(failed.*login|authentication.*failed|invalid.*credentials|attempting|password|login)',
+                'pattern': r'(attempting|failed.*login|failed.*attempt|invalid.*credentials|authentication.*failed)',
                 'severity': 'Medium',
                 'enabled': True,
                 'description': 'Detects multiple failed login attempts'
@@ -36,7 +36,7 @@ class IntrusionDetectionSystem:
             {
                 'id': 'rule_004',
                 'name': 'DDoS Detection',
-                'pattern': r'(flooding|ddos|denial.*service|high.*traffic|request)',
+                'pattern': r'(flooding|ddos|denial.*service|high.*traffic)',
                 'severity': 'Critical',
                 'enabled': True,
                 'description': 'Detects denial of service attacks'

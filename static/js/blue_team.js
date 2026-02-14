@@ -24,8 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Poll every 3s
     setInterval(loadDashboard, 3000);
     setInterval(loadIncidents, 2000);  // Refresh incidents frequently
-    setInterval(checkSnortStatus, 5000);
-    setInterval(autoCloseOldIncidents, 30000);  // Auto-close old incidents every 30s
+    setInterval(checkSnortStatus, 15000);
+    setInterval(autoCloseOldIncidents, 120000);  // Auto-close old incidents every 30s
 });
 
 // ═══════════════════════════════════════════════════════════════════

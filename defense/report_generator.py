@@ -43,7 +43,7 @@ class SOCReportGenerator:
         
         # Body
         self.styles.add(ParagraphStyle(
-            name='BodyText',
+            name='CustomBody',
             parent=self.styles['Normal'],
             fontSize=10,
             leading=14,
@@ -117,7 +117,7 @@ class SOCReportGenerator:
         
         subtitle = Paragraph(
             f"Security Operations Center<br/>Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            self.styles['BodyText']
+            self.styles['CustomBody']
         )
         subtitle.alignment = TA_CENTER
         elements.append(subtitle)
@@ -179,7 +179,7 @@ class SOCReportGenerator:
         firewall level to prevent future attacks from the same sources.
         """
         
-        elements.append(Paragraph(summary_text, self.styles['BodyText']))
+        elements.append(Paragraph(summary_text, self.styles['CustomBody']))
         elements.append(Spacer(1, 0.3*inch))
         
         return elements
@@ -193,7 +193,7 @@ class SOCReportGenerator:
         snort_alerts = [a for a in alerts if a.get('source') == 'snort']
         
         if not snort_alerts:
-            elements.append(Paragraph("No Snort detections during this period.", self.styles['BodyText']))
+            elements.append(Paragraph("No Snort detections during this period.", self.styles['CustomBody']))
             return elements
         
         # Snort stats
@@ -202,7 +202,7 @@ class SOCReportGenerator:
         <b>Detection Rate:</b> Real-time network traffic analysis<br/>
         <b>Alert File:</b> /var/log/snort/alert_fast.txt
         """
-        elements.append(Paragraph(stats_text, self.styles['BodyText']))
+        elements.append(Paragraph(stats_text, self.styles['CustomBody']))
         elements.append(Spacer(1, 0.2*inch))
         
         # Snort alerts table
@@ -243,7 +243,7 @@ class SOCReportGenerator:
         ids_alerts = [a for a in alerts if a.get('source') == 'ids']
         
         if not ids_alerts:
-            elements.append(Paragraph("No IDS pattern matches during this period.", self.styles['BodyText']))
+            elements.append(Paragraph("No IDS pattern matches during this period.", self.styles['CustomBody']))
             return elements
         
         # IDS table
@@ -282,7 +282,7 @@ class SOCReportGenerator:
         
         # Blocked IPs
         if blocked_ips:
-            elements.append(Paragraph(f"<b>Blocked IP Addresses ({len(blocked_ips)}):</b>", self.styles['BodyText']))
+            elements.append(Paragraph(f"<b>Blocked IP Addresses ({len(blocked_ips)}):</b>", self.styles['CustomBody']))
             elements.append(Spacer(1, 0.1*inch))
             
             blocked_data = [['IP Address', 'Timestamp', 'Reason']]
@@ -306,7 +306,7 @@ class SOCReportGenerator:
             
             elements.append(blocked_table)
         else:
-            elements.append(Paragraph("No IP addresses have been blocked during this period.", self.styles['BodyText']))
+            elements.append(Paragraph("No IP addresses have been blocked during this period.", self.styles['CustomBody']))
         
         elements.append(Spacer(1, 0.2*inch))
         
@@ -383,7 +383,7 @@ class SOCReportGenerator:
         # Generate recommendation sections
         for attack_type, rec in recommendations.items():
             if attack_type in attack_types:
-                elements.append(Paragraph(f"<b>{rec['title']}</b>", self.styles['BodyText']))
+                elements.append(Paragraph(f"<b>{rec['title']}</b>", self.styles['CustomBody']))
                 
                 if rec['blocked_ips']:
                     elements.append(Paragraph(
@@ -394,7 +394,7 @@ class SOCReportGenerator:
                 elements.append(Spacer(1, 0.1*inch))
                 
                 for i, recommendation in enumerate(rec['recommendations'], 1):
-                    elements.append(Paragraph(f"{i}. {recommendation}", self.styles['BodyText']))
+                    elements.append(Paragraph(f"{i}. {recommendation}", self.styles['CustomBody']))
                 
                 elements.append(Spacer(1, 0.15*inch))
         
@@ -407,7 +407,7 @@ class SOCReportGenerator:
         elements.append(Paragraph("6. System Logs Summary", self.styles['SectionHeader']))
         
         if not logs:
-            elements.append(Paragraph("No system logs available.", self.styles['BodyText']))
+            elements.append(Paragraph("No system logs available.", self.styles['CustomBody']))
             return elements
         
         # Log statistics
@@ -420,20 +420,20 @@ class SOCReportGenerator:
         <b>System Logs:</b> {len(system_logs)}
         """
         
-        elements.append(Paragraph(stats_text, self.styles['BodyText']))
+        elements.append(Paragraph(stats_text, self.styles['CustomBody']))
         elements.append(Spacer(1, 0.2*inch))
         
         # Recent critical logs
         critical_logs = [l for l in logs if 'error' in l.get('message', '').lower() or 'critical' in l.get('message', '').lower()]
         
         if critical_logs:
-            elements.append(Paragraph("<b>Recent Critical Events:</b>", self.styles['BodyText']))
+            elements.append(Paragraph("<b>Recent Critical Events:</b>", self.styles['CustomBody']))
             elements.append(Spacer(1, 0.1*inch))
             
             for log in critical_logs[:5]:
                 elements.append(Paragraph(
                     f"{self._format_timestamp(log.get('timestamp'))} - {log.get('message', 'No message')[:80]}",
-                    self.styles['BodyText']
+                    self.styles['CustomBody']
                 ))
         
         return elements

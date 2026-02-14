@@ -29,7 +29,12 @@ class SnortMonitor:
         # Alert pattern for Snort 3 alert_fast.txt format
         # Example: 01/30-12:34:56.789012 [**] [1:1000001:2] SQL Injection - OR 1=1 Pattern [**] [Priority: 0] {TCP} 192.168.11.112:54321 -> 172.17.0.2:80
         self.alert_pattern = re.compile(
-            r'(\d{2}/\d{2}-\d{2}:\d{2}:\d{2}\.\d+)\s+\[\*\*\]\s+\[(\d+):(\d+):(\d+)\]\s+([^\[]+?)\s+\[\*\*\].*?\{(\w+)\}\s+(\d+\.\d+\.\d+\.\d+):(\d+)\s+->\s+(\d+\.\d+\.\d+\.\d+):(\d+)'
+            r'(\d{2}/\d{2}-\d{2}:\d{2}:\d{2}\.\d+)\s+'
+            r'\[\*\*\]\s+\[(\d+):(\d+):(\d+)\]\s+'
+            r'([^\[]+?)\s+\[\*\*\]'
+            r'.*?\{(\w+)\}\s*'
+            r'([\d\.a-fA-F:]+?)(?::(\d+))?\s*->\s*'   # src_ip optionally :port
+            r'([\d\.a-fA-F:]+?)(?::(\d+))?$'           # dst_ip optionally :port
         )
         
         # Map SIDs to attack types
@@ -48,6 +53,7 @@ class SnortMonitor:
             1000012: 'brute_force',
             1000013: 'brute_force',
             1000014: 'brute_force',
+            1000015: 'brute_force',
             
             # Port Scan (1000021-1000030)
             1000021: 'port_scanner',
@@ -55,6 +61,8 @@ class SnortMonitor:
             1000023: 'port_scanner',
             1000024: 'port_scanner',
             1000025: 'port_scanner',
+            1000041: 'port_scanner',
+            1000026: 'port_scanner',
             
             # DDoS (1000031-1000040)
             1000031: 'ddos',
@@ -131,7 +139,7 @@ class SnortMonitor:
         if not match:
             # Try to extract at least the message
             if '[**]' in line:
-                print(f"[SnortMonitor] Unparsed alert: {line[:100]}")
+                print(f"[SnortMonitor] ⚠️ PARSE FAILED: {line}")
             return
         
         # Extract alert components
@@ -141,10 +149,10 @@ class SnortMonitor:
         rev = int(match.group(4))
         message = match.group(5).strip()
         protocol = match.group(6)
-        src_ip = match.group(7)
-        src_port = match.group(8)
-        dst_ip = match.group(9)
-        dst_port = match.group(10)
+        src_ip = match.group(7) or 'Unknown'
+        src_port = match.group(8) or '0'
+        dst_ip = match.group(9) or 'Unknown'
+        dst_port = match.group(10) or '0'
         
         # Determine attack type
         attack_type = self.sid_to_attack_type.get(sid, 'unknown')
@@ -153,7 +161,7 @@ class SnortMonitor:
         # Create alert object
         alert = {
             'id': f"snort_{int(time.time() * 1000)}_{sid}",
-            'timestamp': self._parse_snort_timestamp(timestamp_str),
+            'timestamp': datetime.now().isoformat(),
             'source': 'snort',
             'severity': severity,
             'rule_name': message,
@@ -235,7 +243,7 @@ class SnortMonitor:
         if not is_active and self.last_heartbeat_time:
             # Check if last heartbeat was within 30 seconds
             time_since_heartbeat = time.time() - self.last_heartbeat_time
-            is_active = time_since_heartbeat < 30  # 30 seconds timeout
+            is_active = time_since_heartbeat < 60  # 60 seconds timeout
         
         return {
             'total_alerts': self.stats['total_alerts'],

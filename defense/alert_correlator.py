@@ -10,7 +10,7 @@ class AlertCorrelator:
     def __init__(self):
         self.incidents = {}  # incident_id -> incident data
         self.alert_to_incident = {}  # alert_id -> incident_id
-        self.correlation_window = 60  # seconds
+        self.correlation_window = 120  # seconds
         
     def correlate_alert(self, alert):
         """
@@ -50,7 +50,7 @@ class AlertCorrelator:
                 continue
             
             # Check if within time window
-            incident_time = datetime.fromisoformat(incident['first_seen'])
+            incident_time = datetime.fromisoformat(incident['last_seen'])
             if (alert_time - incident_time).total_seconds() > self.correlation_window:
                 continue
             

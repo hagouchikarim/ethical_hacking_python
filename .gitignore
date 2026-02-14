@@ -44,3 +44,9 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+
+#fac
+
+Notebooks/
+reports/
